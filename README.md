@@ -28,6 +28,24 @@ mise exec -- go run ./examples/jev -text "Our integration has been down all morn
 Each run makes one real TypeSafe API request and prints all three decisions.
 Use `-model` to select a model version; the default is `jev-latest`.
 
+Output from a run with the default ticket, "I was charged twice. Please refund
+the duplicate.":
+
+```text
+Model: jev-1.13.0
+Department: billing
+Department probabilities: map[billing:1 technical:0]
+Urgency (0–2): 1.030
+Refund probability: 0.990
+Tokens: 395 input, 62 output
+```
+
+Model versions, decisions, probabilities, and token counts can vary. These are
+sample results, not values the application should expect on every run.
+
+The shorter program below prints only the department, its probabilities, and
+the model version.
+
 ```go
 package main
 
@@ -142,6 +160,29 @@ object and array criteria, and nested input state:
 go test -run ExampleClient_Ask_structuredContent .
 mise exec -- go run ./examples/structured
 mise exec -- go run ./examples/structured -text "The API is down." -focus "Route by the immediate business problem."
+```
+
+The live structured example prints the same fields as the basic example, plus
+the urgency distribution. Its output has this format (illustrative decisions,
+with placeholders for model and token metadata):
+
+```text
+Model: <returned model version>
+Department: billing
+Department probabilities: map[billing:0.98 other:0.01 technical:0.01]
+Urgency (0–2): 1.050
+Urgency probabilities: [0.05 0.85 0.1]
+Refund probability: 0.990
+Tokens: <input count> input, <output count> output
+```
+
+The offline scripted example in `example_test.go` verifies this fixed output
+without calling a model (`go test` checks it rather than printing it):
+
+```text
+Department: billing
+Urgency: 0.7
+Refund probability: 0.98
 ```
 
 Each live run makes one paid API request. Custom backends must declare
