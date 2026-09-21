@@ -1,0 +1,29 @@
+name: Bug report
+description: Report incorrect behavior or an API compatibility problem.
+labels: [bug, needs triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include API keys, customer data, or unredacted HTTP dumps.
+        Report security vulnerabilities privately through the Security tab.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a small Go example and the command you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Go version, systemone version or commit, operating system, backend, and model version.
+    validations:
+      required: true

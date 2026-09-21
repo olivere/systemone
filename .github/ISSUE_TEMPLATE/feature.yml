@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a change to the library.
+labels: [enhancement, needs triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API or behavior
+      description: Include alternatives you considered and whether application code could handle it instead.
+    validations:
+      required: true
