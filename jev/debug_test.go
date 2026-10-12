@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/olivere/systemone/internal/httpdebug"
 )
 
 type debugTransport func(*http.Request) (*http.Response, error)
@@ -87,7 +89,7 @@ func TestDebugErrorBodyLimits(t *testing.T) {
 			if enabled {
 				debug = &output
 			}
-			body := &observedBody{reader: strings.NewReader(strings.Repeat("x", maxDebugBodyBytes+200))}
+			body := &observedBody{reader: strings.NewReader(strings.Repeat("x", httpdebug.MaxBodyBytes+200))}
 			backend, err := New(Config{APIKey: "test", Debug: debug, HTTPClient: &http.Client{Transport: debugTransport(func(*http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 429, Status: "429 Too Many Requests", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1, Body: body}, nil
 			})}})
@@ -101,12 +103,12 @@ func TestDebugErrorBodyLimits(t *testing.T) {
 			}
 			wantRead := 0
 			if enabled {
-				wantRead = maxDebugBodyBytes + 1
+				wantRead = httpdebug.MaxBodyBytes + 1
 			}
 			if body.read != wantRead || !body.closed {
 				t.Fatalf("read=%d closed=%v", body.read, body.closed)
 			}
-			if enabled && (!strings.Contains(output.String(), "[body truncated") || strings.Contains(output.String(), strings.Repeat("x", maxDebugBodyBytes+1))) {
+			if enabled && (!strings.Contains(output.String(), "[body truncated") || strings.Contains(output.String(), strings.Repeat("x", httpdebug.MaxBodyBytes+1))) {
 				t.Fatal("body truncation missing")
 			}
 			if !enabled && output.Len() != 0 {
@@ -140,7 +142,7 @@ func TestDebugFailuresDoNotReplaceHTTPError(t *testing.T) {
 	if !strings.Contains(output.String(), "[body read incomplete]") {
 		t.Fatal("missing incomplete-body marker")
 	}
-	backend.debug = failedWriter{}
+	backend.debug = httpdebug.New("jev", failedWriter{})
 	_, err = backend.Evaluate(t.Context(), mixedRequest())
 	if _, ok := errors.AsType[*HTTPError](err); !ok {
 		t.Fatalf("writer replaced error: %v", err)
@@ -152,7 +154,7 @@ func TestDebugConcurrencyAndRequestTruncation(t *testing.T) {
 	var output bytes.Buffer
 	backend, err := New(Config{APIKey: "test", Debug: &output, HTTPClient: &http.Client{Transport: debugTransport(func(req *http.Request) (*http.Response, error) {
 		body, err := io.ReadAll(req.Body)
-		if err != nil || len(body) <= maxDebugBodyBytes {
+		if err != nil || len(body) <= httpdebug.MaxBodyBytes {
 			t.Errorf("full request not preserved: size %d, %v", len(body), err)
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(mixedResponse))}, nil
@@ -161,7 +163,7 @@ func TestDebugConcurrencyAndRequestTruncation(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := mixedRequest()
-	request.State = []byte(`"` + strings.Repeat("a", maxDebugBodyBytes+100) + `"`)
+	request.State = []byte(`"` + strings.Repeat("a", httpdebug.MaxBodyBytes+100) + `"`)
 	var group sync.WaitGroup
 	for range 12 {
 		group.Go(func() {
@@ -174,22 +176,8 @@ func TestDebugConcurrencyAndRequestTruncation(t *testing.T) {
 	if strings.Count(output.String(), "--- jev request") != 12 || strings.Count(output.String(), "--- jev response") != 12 || strings.Count(output.String(), "[body truncated") != 12 {
 		t.Fatal("missing concurrent dump entries")
 	}
-	backend.debug = failedWriter{}
+	backend.debug = httpdebug.New("jev", failedWriter{})
 	if _, err := backend.Evaluate(t.Context(), request); err != nil {
 		t.Fatalf("writer failure affected success: %v", err)
-	}
-}
-
-func TestDebugHeaderRedaction(t *testing.T) {
-	t.Parallel()
-	headers := http.Header{"Authorization": {"secret"}, "Cookie": {"secret"}, "Proxy-Authorization": {"secret"}, "X-Key": {"secret"}, "Content-Type": {"application/json"}, "X-Request-Id": {"request-1"}}
-	clean := debugHeaders(headers)
-	for name, values := range clean {
-		if name != "Content-Type" && name != "X-Request-Id" && (len(values) != 1 || values[0] != "[REDACTED]") {
-			t.Errorf("unredacted header %s", name)
-		}
-	}
-	if headers.Get("Authorization") != "secret" {
-		t.Fatal("input mutated")
 	}
 }

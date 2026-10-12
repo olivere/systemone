@@ -4,7 +4,8 @@ Small, standard-library-only Go library for typed AI decisions. Requires Go 1.27
 
 Define questions once, evaluate them together, and read results through the same
 typed handles. Application code uses `systemone`; model selection and credentials
-belong in backend setup. The `jev` package supports TypeSafe's HTTP API.
+belong in backend setup. The `jev` package supports TypeSafe's HTTP API, and the
+`openai` package supports the OpenAI Decisions API.
 
 ```sh
 go get github.com/olivere/systemone
@@ -116,6 +117,66 @@ That call returns `ErrNotAsked`, even if the other handle has the same key.
 Copying a handle preserves its identity. `Noul.When(yes, no)` creates a new
 handle; use that returned handle for both `Ask` and `In`.
 
+## Use OpenAI
+
+The `openai` package calls the [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions),
+which is in public beta. Set `OPENAI_API_KEY` in `mise.toml` and run the
+[live example](examples/openai/main.go), which asks the same three questions as
+the Jev example:
+
+```sh
+mise exec -- go run ./examples/openai
+mise exec -- go run ./examples/openai -text "Our integration has been down all morning."
+```
+
+Output from a run with the default ticket:
+
+```text
+Model: gpt-6-luna
+Department: billing
+Department probabilities: map[billing:1 technical:0]
+Urgency (0–2): 1.130
+Refund probability: 1.000
+Tokens: 404 input, 0 output
+```
+
+Application code stays the same; only the backend changes:
+
+```go
+backend, err := openai.New(openai.Config{APIKey: os.Getenv("OPENAI_API_KEY")})
+```
+
+The Decisions API takes text where systemone allows JSON, so the adapter
+translates:
+
+| systemone | Decisions API |
+| --- | --- |
+| State | `input`: a JSON string as its text, an object or array as its JSON text |
+| Choice | `choice` question; options become `choices` with `value` and `description` |
+| Score | `score` question; each level becomes a level `label` |
+| Noul | `predicate` question; `When` descriptions are appended to the instructions as "True if:" and "False if:" lines |
+| `Content` | Its text for JSON strings, its JSON text for objects and arrays |
+
+Question keys become question names. The API rejects requests with more than
+255 choices, 10 score levels, or 200 questions, and `Capabilities` declares
+these limits so `Check` catches them without a network call. The guide does not
+publish the level and question limits; they come from the API's validation errors.
+
+The model can refuse a question. `Ask` then fails with an error that wraps
+`openai.ErrRefused` and names the refused keys, because a systemone result needs
+every answer. Answers report `Source` as `Native`: the API returns the
+distributions itself instead of generating numbers as text. That says nothing
+about calibration.
+
+`openai.Config` accepts `BaseURL`, `Model`, `HTTPClient`, and `Debug`. The HTTP
+client follows the same timeout, redirect, and response-size rules as `jev`. The defaults are `https://api.openai.com` and
+`gpt-6-luna`; the adapter appends `/v1/decisions`. An API key is always
+required, so a plain `http` base URL is accepted only for loopback hosts. Non-2xx responses return `*openai.HTTPError` with the status, the
+error `Type` and `Code` (such as `invalid_api_key` or `insufficient_quota`), and
+the `X-Request-Id` to quote to OpenAI support. The error message is omitted
+because it can echo request content. Image input is not supported, because
+systemone state is JSON.
+
 ## Structured instructions and criteria
 
 Use the additive `NewChoiceContent`, `NewScoreContent`, and `NewNoulContent`
@@ -201,8 +262,8 @@ A three-level Score ranges from 0 to 2 and can be fractional. All distributions
 must be present. Validation allows rounding error of `ProbabilityTolerance`
 (0.001) in their sum and that tolerance times the level count in expected scores.
 Individual probabilities must remain within [0,1]. Values are never normalized.
-Confidence is optional in the domain contract; the Jev adapter requires it for
-Choice and Score because the TypeSafe protocol does.
+Confidence is optional in the domain contract; the Jev and OpenAI adapters
+require it for Choice and Score because both protocols return it.
 
 Results report `Source` as `Native`, `Estimated`, or `Unspecified`. This describes
 how probabilities were obtained. It says nothing about calibration. Jev's
@@ -251,14 +312,15 @@ including server response bodies. There are no automatic retries or fallbacks.
 
 ### HTTP debugging
 
-Both live examples accept `-debug` to dump HTTP requests and responses to stderr:
+The live examples accept `-debug` to dump HTTP requests and responses to stderr:
 
 ```sh
 mise exec -- go run ./examples/jev -debug
 mise exec -- go run ./examples/structured -debug
+mise exec -- go run ./examples/openai -debug
 ```
 
-In your application, set `jev.Config.Debug` to a writer:
+In your application, set `jev.Config.Debug` or `openai.Config.Debug` to a writer:
 
 ```go
 backend, err := jev.New(jev.Config{
@@ -335,6 +397,7 @@ calibration have not been measured by this package.
 - [Score semantics](https://docs.typesafe.ai/primitives/score)
 - [Confidence semantics](https://docs.typesafe.ai/confidence)
 - [TypeSafe's LLM adapter](https://github.com/typesafe-ai/system-one-adapter-python)
+- [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions)
 - [OpenJev HTTP server](https://github.com/razorback16/openjev)
 - [OpenJev SGLang server](https://github.com/ekzhang/openjev-sglang)
 - [Laya Python implementation](https://github.com/NandhaKishorM/laya)

@@ -12,10 +12,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/olivere/systemone"
+	"github.com/olivere/systemone/internal/httpdebug"
 )
 
 const maxResponseBytes = 8 << 20
@@ -48,8 +48,7 @@ type Backend struct {
 	client       *http.Client
 	source       systemone.ProbabilitySource
 	capabilities systemone.Capabilities
-	debug        io.Writer
-	debugMu      sync.Mutex
+	debug        *httpdebug.Dumper
 }
 
 // New constructs a backend without making a network request. A custom client
@@ -103,7 +102,7 @@ func New(cfg Config) (*Backend, error) {
 	if capabilities.MaxOptions < 0 || capabilities.MaxLevels < 0 || capabilities.MaxQuestions < 0 {
 		return nil, fmt.Errorf("jev/new: invalid capabilities")
 	}
-	return &Backend{endpoint: strings.TrimRight(base, "/") + "/v1/systemone", key: cfg.APIKey, model: model, client: &client, source: source, capabilities: capabilities, debug: cfg.Debug}, nil
+	return &Backend{endpoint: strings.TrimRight(base, "/") + "/v1/systemone", key: cfg.APIKey, model: model, client: &client, source: source, capabilities: capabilities, debug: httpdebug.New("jev", cfg.Debug)}, nil
 }
 
 // Capabilities returns the documented API limits. No question-count ceiling is published.
@@ -185,7 +184,7 @@ func (b *Backend) Evaluate(ctx context.Context, request systemone.Request) (syst
 	if b.key != "" {
 		req.Header.Set("Authorization", "Bearer "+b.key)
 	}
-	b.debugRequest(req, body)
+	b.debug.Request(req, body)
 	res, err := b.client.Do(req)
 	if err != nil {
 		return systemone.Response{}, fmt.Errorf("jev/evaluate: send request: %w", err)
@@ -194,13 +193,13 @@ func (b *Backend) Evaluate(ctx context.Context, request systemone.Request) (syst
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		if b.debug != nil {
-			data, readErr := io.ReadAll(io.LimitReader(res.Body, maxDebugBodyBytes+1))
-			b.debugResponse(res, data, readErr != nil)
+			data, readErr := io.ReadAll(io.LimitReader(res.Body, httpdebug.MaxBodyBytes+1))
+			b.debug.Response(res, data, readErr != nil)
 		}
 		return systemone.Response{}, &HTTPError{StatusCode: res.StatusCode}
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, maxResponseBytes+1))
-	b.debugResponse(res, data, err != nil)
+	b.debug.Response(res, data, err != nil)
 	if err != nil {
 		return systemone.Response{}, fmt.Errorf("jev/evaluate: read response: %w", err)
 	}
