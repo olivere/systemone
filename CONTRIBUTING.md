@@ -4,7 +4,7 @@ Open an issue before adding a dependency, a backend, or a large public API chang
 Keep changes focused. Preserve the standard-library-only implementation and the
 separation between model configuration and application decisions.
 
-Use Go 1.27 or newer. Before submitting a pull request, run:
+Use Go 1.27.2 or newer. Before submitting a pull request, run:
 
 ```sh
 gofumpt -w .
@@ -22,6 +22,8 @@ tests. Include regression tests for fixes and examples for new public APIs.
 Keep `mise.toml` local. Never include credentials, customer data, or unredacted
 HTTP dumps in commits, issues, or pull requests. See [SECURITY.md](SECURITY.md)
 for vulnerability reports.
+
+Add user-visible changes to `CHANGELOG.md` under an `Unreleased` heading.
 
 Use a feature branch and a short, descriptive pull request title. Pull requests
 are squash-merged; the title becomes the commit subject. Submissions are covered
