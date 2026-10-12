@@ -1,3 +1,4 @@
 [env]
-# Copy this file to mise.toml and enter your TypeSafe AI API key there.
+# Copy this file to mise.toml and enter your API keys there.
 TYPESAFE_API_KEY = ""
+OPENAI_API_KEY = ""
