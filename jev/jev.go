@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -68,6 +69,10 @@ func New(cfg Config) (*Backend, error) {
 	}
 	if strings.ContainsAny(cfg.APIKey, "\r\n") {
 		return nil, fmt.Errorf("jev/new: invalid API key")
+	}
+	// A key must not travel over plain HTTP beyond the host; keyless servers may.
+	if cfg.APIKey != "" && u.Scheme == "http" && !loopback(u.Hostname()) {
+		return nil, fmt.Errorf("jev/new: base URL must use https with an API key")
 	}
 	model := cfg.Model
 	if model == "" {
@@ -270,6 +275,14 @@ func (b *Backend) Evaluate(ctx context.Context, request systemone.Request) (syst
 		return systemone.Response{}, err
 	}
 	return response, nil
+}
+
+func loopback(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsLoopback()
 }
 
 func invalid(message string) error {

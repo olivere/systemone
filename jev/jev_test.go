@@ -31,7 +31,8 @@ const mixedResponse = `{"model":"jev-test","usage":{"input_tokens":10,"output_to
 func testBackend(t *testing.T, handler http.HandlerFunc) *Backend {
 	t.Helper()
 	server := httptest.NewTestServer(t, handler)
-	backend, err := New(Config{BaseURL: server.URL, APIKey: "test-key", HTTPClient: server.Client()})
+	// The in-memory network accepts any address; a key over plain HTTP needs a loopback host.
+	backend, err := New(Config{BaseURL: "http://localhost", APIKey: "test-key", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +229,7 @@ func TestRedirectRejected(t *testing.T) {
 	}))
 	client := server.Client()
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { t.Error("caller redirect policy used"); return nil }
-	backend, err := New(Config{BaseURL: server.URL, HTTPClient: client, APIKey: "test"})
+	backend, err := New(Config{BaseURL: "http://localhost", HTTPClient: client, APIKey: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +245,7 @@ func TestRedirectRejected(t *testing.T) {
 
 func TestConfig(t *testing.T) {
 	t.Parallel()
-	for _, cfg := range []Config{{}, {BaseURL: "ftp://host"}, {BaseURL: "https://user:pass@host"}, {BaseURL: "https://host?secret=value"}, {BaseURL: "https://host#fragment"}, {BaseURL: "/relative"}, {APIKey: "bad\nkey"}} {
+	for _, cfg := range []Config{{}, {BaseURL: "ftp://host"}, {BaseURL: "https://user:pass@host"}, {BaseURL: "https://host?secret=value"}, {BaseURL: "https://host#fragment"}, {BaseURL: "/relative"}, {APIKey: "bad\nkey"}, {BaseURL: "http://proxy.internal", APIKey: "key"}, {BaseURL: "http://10.0.0.1:8000", APIKey: "key"}} {
 		if _, err := New(cfg); err == nil {
 			t.Errorf("accepted invalid config: %#v", cfg)
 		}
@@ -262,6 +263,11 @@ func TestConfig(t *testing.T) {
 	}
 	if custom.source != systemone.Unspecified || custom.Capabilities().MaxOptions != 0 || custom.model != "custom" {
 		t.Fatalf("unexpected custom backend: %#v", custom)
+	}
+	for _, cfg := range []Config{{BaseURL: "http://proxy.internal:8000"}, {BaseURL: "http://127.0.0.1:8000", APIKey: "key"}, {BaseURL: "http://[::1]:8000", APIKey: "key"}, {BaseURL: "http://localhost:8000", APIKey: "key"}, {BaseURL: "https://proxy.internal", APIKey: "key"}} {
+		if _, err := New(cfg); err != nil {
+			t.Errorf("rejected %#v: %v", cfg, err)
+		}
 	}
 }
 

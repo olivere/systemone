@@ -299,7 +299,8 @@ no declared limit, not unlimited model capacity or guaranteed accuracy.
 
 `jev.Config` accepts a custom `BaseURL`, `Model`, `HTTPClient`, `Capabilities`, and
 `ProbabilitySource`. The base URL is an origin or path prefix; the adapter appends
-`/v1/systemone`. API keys are optional for custom servers. TypeSafe defaults are
+`/v1/systemone`. API keys are optional for custom servers. With a key, a plain
+`http` base URL is accepted only for loopback hosts. TypeSafe defaults are
 `https://api.typesafe.ai`, `jev-latest`, 255 Choice options, and 10 Score levels.
 Custom endpoints default to no declared ceilings and `Unspecified` probability
 source. Pin a model version when evaluating thresholds.
