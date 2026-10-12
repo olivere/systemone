@@ -4,7 +4,7 @@ Open an issue before adding a dependency, a backend, or a large public API chang
 Keep changes focused. Preserve the standard-library-only implementation and the
 separation between model configuration and application decisions.
 
-Use Go 1.27 or newer. Before submitting a pull request, run:
+Use Go 1.27.2 or newer. Before submitting a pull request, run:
 
 ```sh
 gofumpt -w .
