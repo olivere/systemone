@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/olivere/systemone"
+	"github.com/olivere/systemone/internal/baseurl"
 	"github.com/olivere/systemone/internal/httpdebug"
 )
 
@@ -23,9 +23,11 @@ const maxResponseBytes = 8 << 20
 // Config configures the HTTP endpoint. BaseURL is an origin or path prefix;
 // the backend appends /v1/systemone. An empty BaseURL selects TypeSafe AI.
 type Config struct {
-	APIKey     string
-	BaseURL    string
-	Model      string
+	APIKey  string
+	BaseURL string
+	Model   string
+	// HTTPClient's transport must not proxy plain http requests to a loopback
+	// base URL, because they carry the API key in cleartext.
 	HTTPClient *http.Client
 	// Debug enables synchronous HTTP dumps. Nil disables debugging. Headers
 	// outside a protocol allowlist are redacted, but bodies are NOT redacted and
@@ -58,9 +60,9 @@ func New(cfg Config) (*Backend, error) {
 	if base == "" {
 		base = "https://api.typesafe.ai"
 	}
-	u, err := url.Parse(base)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("jev/new: invalid base URL")
+	u, err := baseurl.Parse(base, cfg.APIKey != "")
+	if err != nil {
+		return nil, fmt.Errorf("jev/new: %w", err)
 	}
 	official := u.Scheme == "https" && u.Host == "api.typesafe.ai" && strings.TrimRight(u.Path, "/") == ""
 	if official && strings.TrimSpace(cfg.APIKey) == "" {

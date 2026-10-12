@@ -171,7 +171,7 @@ about calibration.
 `openai.Config` accepts `BaseURL`, `Model`, `HTTPClient`, and `Debug`. The HTTP
 client follows the same timeout, redirect, and response-size rules as `jev`. The defaults are `https://api.openai.com` and
 `gpt-6-luna`; the adapter appends `/v1/decisions`. An API key is always
-required, so a plain `http` base URL is accepted only for loopback hosts. Non-2xx responses return `*openai.HTTPError` with the status, the
+required, so a plain `http` base URL must use a loopback IP address, as for `jev`. Non-2xx responses return `*openai.HTTPError` with the status, the
 error `Type` and `Code` (such as `invalid_api_key` or `insufficient_quota`), and
 the `X-Request-Id` to quote to OpenAI support. The error message is omitted
 because it can echo request content. Image input is not supported, because
@@ -299,7 +299,11 @@ no declared limit, not unlimited model capacity or guaranteed accuracy.
 
 `jev.Config` accepts a custom `BaseURL`, `Model`, `HTTPClient`, `Capabilities`, and
 `ProbabilitySource`. The base URL is an origin or path prefix; the adapter appends
-`/v1/systemone`. API keys are optional for custom servers. TypeSafe defaults are
+`/v1/systemone`. API keys are optional for custom servers. With a key, a plain
+`http` base URL must use a loopback IP address such as `127.0.0.1` or `[::1]`.
+The name `localhost` is rejected, because Go resolves it through DNS when
+`/etc/hosts` lacks an entry, which would send the key off the machine in
+cleartext. A custom `HTTPClient` must not proxy those requests either. TypeSafe defaults are
 `https://api.typesafe.ai`, `jev-latest`, 255 Choice options, and 10 Score levels.
 Custom endpoints default to no declared ceilings and `Unspecified` probability
 source. Pin a model version when evaluating thresholds.
