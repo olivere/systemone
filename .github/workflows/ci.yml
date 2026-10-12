@@ -39,7 +39,7 @@ jobs:
       - name: Install check tools
         run: |
           go install mvdan.cc/gofumpt@v0.10.0
-          go install honnef.co/go/tools/cmd/staticcheck@v0.8.0-rc.1
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Check formatting
