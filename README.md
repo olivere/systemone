@@ -1,6 +1,6 @@
 # systemone
 
-Small, standard-library-only Go library for typed AI decisions. Requires Go 1.27+.
+Small, standard-library-only Go library for typed AI decisions. Requires Go 1.27.2 or newer.
 
 Define questions once, evaluate them together, and read results through the same
 typed handles. Application code uses `systemone`; model selection and credentials
