@@ -33,8 +33,8 @@ const mixedResponse = `{"model":"gpt-6-luna","answers":[` +
 func testBackend(t *testing.T, handler http.HandlerFunc) *Backend {
 	t.Helper()
 	server := httptest.NewTestServer(t, handler)
-	// The in-memory network accepts any address; plain HTTP needs a loopback host.
-	backend, err := New(Config{BaseURL: "http://localhost", APIKey: "test-key", HTTPClient: server.Client()})
+	// The in-memory network accepts any address; plain HTTP needs a loopback IP.
+	backend, err := New(Config{BaseURL: "http://127.0.0.1", APIKey: "test-key", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestRedirectRejected(t *testing.T) {
 	}))
 	client := server.Client()
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { t.Error("caller redirect policy used"); return nil }
-	backend, err := New(Config{BaseURL: "http://localhost", HTTPClient: client, APIKey: "test"})
+	backend, err := New(Config{BaseURL: "http://127.0.0.1", HTTPClient: client, APIKey: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestRedirectRejected(t *testing.T) {
 
 func TestConfig(t *testing.T) {
 	t.Parallel()
-	for _, cfg := range []Config{{}, {APIKey: " "}, {APIKey: "bad\nkey"}, {APIKey: "k", Model: " "}, {APIKey: "k", BaseURL: "ftp://host"}, {APIKey: "k", BaseURL: "https://user:pass@host"}, {APIKey: "k", BaseURL: "https://host?secret=value"}, {APIKey: "k", BaseURL: "https://host#fragment"}, {APIKey: "k", BaseURL: "/relative"}, {APIKey: "k", BaseURL: "http://proxy.internal"}, {APIKey: "k", BaseURL: "http://10.0.0.1"}} {
+	for _, cfg := range []Config{{}, {APIKey: " "}, {APIKey: "bad\nkey"}, {APIKey: "k", Model: " "}, {APIKey: "k", BaseURL: "ftp://host"}, {APIKey: "k", BaseURL: "https://user:pass@host"}, {APIKey: "k", BaseURL: "https://host?secret=value"}, {APIKey: "k", BaseURL: "https://host#fragment"}, {APIKey: "k", BaseURL: "/relative"}, {APIKey: "k", BaseURL: "http://proxy.internal"}, {APIKey: "k", BaseURL: "http://10.0.0.1"}, {APIKey: "k", BaseURL: "http://localhost:8000"}} {
 		if _, err := New(cfg); err == nil {
 			t.Errorf("accepted invalid config: %#v", cfg)
 		}
@@ -310,11 +310,11 @@ func TestConfig(t *testing.T) {
 	if caps.MaxOptions != 255 || caps.MaxLevels != 10 || caps.MaxQuestions != 200 || !caps.Choice || !caps.Score || !caps.Noul {
 		t.Fatalf("unexpected capabilities: %#v", caps)
 	}
-	custom, err := New(Config{APIKey: "test", BaseURL: "http://localhost:8000/proxy/", Model: "custom"})
+	custom, err := New(Config{APIKey: "test", BaseURL: "http://127.0.0.1:8000/proxy/", Model: "custom"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if custom.endpoint != "http://localhost:8000/proxy/v1/decisions" || custom.model != "custom" {
+	if custom.endpoint != "http://127.0.0.1:8000/proxy/v1/decisions" || custom.model != "custom" {
 		t.Fatalf("unexpected custom backend: %#v", custom)
 	}
 	for _, base := range []string{"http://127.0.0.1:8080", "http://[::1]:8080", "https://proxy.internal"} {

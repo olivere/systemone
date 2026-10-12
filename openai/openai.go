@@ -10,12 +10,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/netip"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/olivere/systemone"
+	"github.com/olivere/systemone/internal/baseurl"
 	"github.com/olivere/systemone/internal/httpdebug"
 )
 
@@ -28,9 +27,11 @@ var ErrRefused = errors.New("question refused")
 // Config configures the HTTP endpoint. BaseURL is an origin or path prefix;
 // the backend appends /v1/decisions. An empty BaseURL selects api.openai.com.
 type Config struct {
-	APIKey     string
-	BaseURL    string
-	Model      string
+	APIKey  string
+	BaseURL string
+	Model   string
+	// HTTPClient's transport must not proxy plain http requests to a loopback
+	// base URL, because they carry the API key in cleartext.
 	HTTPClient *http.Client
 	// Debug enables synchronous HTTP dumps. Nil disables debugging. Headers
 	// outside a protocol allowlist are redacted, but bodies are NOT redacted and
@@ -56,13 +57,9 @@ func New(cfg Config) (*Backend, error) {
 	if base == "" {
 		base = "https://api.openai.com"
 	}
-	u, err := url.Parse(base)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("openai/new: invalid base URL")
-	}
-	// Every request carries the API key, so plain HTTP must not leave the host.
-	if u.Scheme == "http" && !loopback(u.Hostname()) {
-		return nil, fmt.Errorf("openai/new: base URL must use https")
+	// Every request carries the API key.
+	if _, err := baseurl.Parse(base, true); err != nil {
+		return nil, fmt.Errorf("openai/new: %w", err)
 	}
 	if strings.TrimSpace(cfg.APIKey) == "" {
 		return nil, fmt.Errorf("openai/new: API key required")
@@ -378,14 +375,6 @@ func identifier(s string) string {
 		}
 	}
 	return s
-}
-
-func loopback(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip, err := netip.ParseAddr(host)
-	return err == nil && ip.IsLoopback()
 }
 
 func invalid(message string) error {
